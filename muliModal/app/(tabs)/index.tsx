@@ -1,11 +1,8 @@
 import { StyleSheet, View, Text, Switch, Pressable, TouchableOpacity, Platform, TextInput, Animated } from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
-import { Audio } from 'expo-av';
 import { useState, useEffect, useRef } from 'react';
-import { AudioVisualizer } from '../../components/AudioVisualizer';
 import { VideoRecorder, VideoQuality, FileType } from '../../components/VideoRecorder';
 import { RecordingOptions, RecordingInterval } from '../../components/RecordingOptions';
-import { AccelerationVisualizer } from '../../components/AccelerationVisualizer';
 import { VideoPlayer } from '../../components/VideoPlayer';
 import io from 'socket.io-client';
 import { router } from 'expo-router';
@@ -15,10 +12,7 @@ const SIGN_WORDS = [
 ];
 
 export default function HomePage() {
-  const [audioPermission, setAudioPermission] = useState<boolean | null>(null);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-  const [isAccelerationEnabled, setIsAccelerationEnabled] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [key, setKey] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<RecordingInterval>('∞');
@@ -28,7 +22,6 @@ export default function HomePage() {
   const [fileType, setFileType] = useState<FileType>(Platform.OS === 'web' ? 'webm' : 'mp4');
   const [elapsedTime, setElapsedTime] = useState(0);
   const [maxDuration, setMaxDuration] = useState<number | null>(null);
-  const [accelerationData, setAccelerationData] = useState<Array<{ x: number; y: number; z: number; timestamp: number }>>([]);
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [videoBase64, setVideoBase64] = useState<string | null>(null);
   const [videoMimeType, setVideoMimeType] = useState<string>('video/mp4');
@@ -49,9 +42,6 @@ export default function HomePage() {
       if (!permission?.granted) {
         const status = await requestPermission();
       }
-      
-      const audioStatus = await Audio.requestPermissionsAsync();
-      setAudioPermission(audioStatus.status === 'granted');
     })();
   }, [permission, requestPermission]);
 
@@ -124,26 +114,6 @@ export default function HomePage() {
   }, [isRecording, recordingInterval]);
 
   useEffect(() => {
-    // Connect to the acceleration server
-    const socket = io('http://localhost:3000');
-
-    // Listen for initial acceleration history
-    socket.on('acceleration-history', (history: Array<{ x: number; y: number; z: number; timestamp: number }>) => {
-      setAccelerationData(history);
-    });
-
-    // Listen for real-time acceleration updates
-    socket.on('acceleration-update', (newData: { x: number; y: number; z: number; timestamp: number }) => {
-      setAccelerationData(prev => [...prev, newData].slice(-100)); // Keep last 100 readings
-    });
-
-    // Cleanup on unmount
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
     // Get a random word on component mount
     const randomWord = SIGN_WORDS[Math.floor(Math.random() * SIGN_WORDS.length)];
     handleWordSelect(randomWord);
@@ -163,56 +133,83 @@ export default function HomePage() {
     }
   };
 
-  const toggleAudio = (value: boolean) => {
-    if (audioPermission) {
-      setIsAudioEnabled(value);
-      if (value) {
-        setKey(prev => prev + 1);
-      }
-    } else {
-      alert('Audio permission not granted');
-    }
-  };
-
   const handleIntervalSelect = (interval: RecordingInterval) => {
     setRecordingInterval(interval);
   };
 
-  const handleAudioRecordingComplete = async (uri: string, duration: number) => {
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      console.log('Audio recording size:', blob.size, 'bytes');
-      console.log('Audio recording type:', blob.type);
-      
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      const fileName = `audio_recording_${new Date().toISOString()}.webm`;
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error saving audio recording:', error);
+  const handleRecordingComplete = async (uri: string, duration: number) => {
+    setIsRecording(false);
+    setTempRecordedVideo(uri);
+    setIsReviewing(true);
+  };
+
+  const handleSave = async () => {
+    if (tempRecordedVideo) {
+      await handleVideoRecordingComplete(tempRecordedVideo, 0);
+      setTempRecordedVideo(null);
+      setIsReviewing(false);
     }
   };
 
-  const animateCount = () => {
-    countAnimation.setValue(1);
-    Animated.sequence([
-      Animated.spring(countAnimation, {
-        toValue: 2.2,
-        friction: 4,
-        tension: 20,
-        useNativeDriver: true,
-      }),
-      Animated.spring(countAnimation, {
-        toValue: 1,
-        friction: 8,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const handleDiscard = () => {
+    setTempRecordedVideo(null);
+    setIsReviewing(false);
+  };
+
+  const toggleRecording = () => {
+    if (!isCameraEnabled) {
+      alert('Please enable camera first');
+      return;
+    }
+    setIsRecording(!isRecording);
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('username');
+    setUsername('');
+    router.replace('/sign-in');
+  };
+
+  const handleWordSelect = async (word: string) => {
+    setSignLabel(word);
+    
+    // Trigger search immediately after selecting the word
+    try {
+      setSearchStatus({
+        message: 'Searching...',
+        status: 'none'
+      });
+      setVideoBase64(null);
+      setVideoUri(null);
+
+      const response = await fetch('http://localhost:3000/search-sign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ word: word }),
+      });
+
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.videoData) {
+        console.log('Received video data, length:', data.videoData.length);
+        setVideoBase64(data.videoData);
+        setVideoMimeType(data.mimeType || 'video/mp4');
+        setCurrentSignName(word);
+      } else {
+        setSearchStatus({
+          message: data.message,
+          status: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchStatus({
+        message: 'Error processing video data',
+        status: 'error'
+      });
+    }
   };
 
   const handleVideoRecordingComplete = async (uri: string, duration: number) => {
@@ -276,79 +273,22 @@ export default function HomePage() {
     }
   };
 
-  const handleRecordingComplete = async (uri: string, duration: number) => {
-    setIsRecording(false);
-    setTempRecordedVideo(uri);
-    setIsReviewing(true);
-  };
-
-  const handleSave = async () => {
-    if (tempRecordedVideo) {
-      await handleVideoRecordingComplete(tempRecordedVideo, 0);
-      setTempRecordedVideo(null);
-      setIsReviewing(false);
-    }
-  };
-
-  const handleDiscard = () => {
-    setTempRecordedVideo(null);
-    setIsReviewing(false);
-  };
-
-  const toggleRecording = () => {
-    if (!isAudioEnabled && !isCameraEnabled) {
-      alert('Please enable audio or camera first');
-      return;
-    }
-    setIsRecording(!isRecording);
-  };
-
-  const handleSignOut = () => {
-    localStorage.removeItem('username');
-    setUsername('');
-    router.replace('/sign-in');
-  };
-
-  const handleWordSelect = async (word: string) => {
-    setSignLabel(word);
-    
-    // Trigger search immediately after selecting the word
-    try {
-      setSearchStatus({
-        message: 'Searching...',
-        status: 'none'
-      });
-      setVideoBase64(null);
-      setVideoUri(null);
-
-      const response = await fetch('http://localhost:3000/search-sign', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ word: word }),
-      });
-
-      const data = await response.json();
-      
-      if (data.status === 'success' && data.videoData) {
-        console.log('Received video data, length:', data.videoData.length);
-        setVideoBase64(data.videoData);
-        setVideoMimeType(data.mimeType || 'video/mp4');
-        setCurrentSignName(word);
-      } else {
-        setSearchStatus({
-          message: data.message,
-          status: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchStatus({
-        message: 'Error processing video data',
-        status: 'error'
-      });
-    }
+  const animateCount = () => {
+    countAnimation.setValue(1);
+    Animated.sequence([
+      Animated.spring(countAnimation, {
+        toValue: 2.2,
+        friction: 4,
+        tension: 20,
+        useNativeDriver: true,
+      }),
+      Animated.spring(countAnimation, {
+        toValue: 1,
+        friction: 8,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const SettingsOverlay = () => (
@@ -505,19 +445,7 @@ export default function HomePage() {
           )}
         </View>
         
-        {isAudioEnabled && (
-          <AudioVisualizer
-            key={key}
-            isRecording={isRecording}
-            onRecordingComplete={handleAudioRecordingComplete}
-            recordingInterval={recordingInterval}
-          />
-        )}
-        
         <View style={styles.rightContainer}>
-          {isAccelerationEnabled && (
-            <AccelerationVisualizer data={accelerationData} />
-          )}
           {(videoUri || videoBase64) && !tempRecordedVideo && (
               <VideoPlayer 
                 uri={videoUri || undefined}
@@ -539,24 +467,6 @@ export default function HomePage() {
               trackColor={{ false: '#767577', true: '#81b0ff' }}
             />
           </View>
-          
-          <View style={styles.controlItem}>
-            <Text style={styles.controlText}>Audio</Text>
-            <Switch
-              value={isAudioEnabled}
-              onValueChange={toggleAudio}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-            />
-          </View>
-
-          <View style={styles.controlItem}>
-            <Text style={styles.controlText}>Acceleration</Text>
-            <Switch
-              value={isAccelerationEnabled}
-              onValueChange={setIsAccelerationEnabled}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-            />
-          </View>
         </View>
 
         {!isReviewing ? (
@@ -566,7 +476,7 @@ export default function HomePage() {
               isRecording && styles.recordButtonActive
             ]}
             onPress={toggleRecording}
-            disabled={!isAudioEnabled && !isCameraEnabled}
+            disabled={!isCameraEnabled}
           />
         ) : (
           <View style={styles.reviewButtonsContainer}>

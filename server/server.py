@@ -1,16 +1,13 @@
-from fastapi import FastAPI, Response, UploadFile, File
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
-import socketio
 import uvicorn
 import os
 import base64
 from videoDownloader import download_sign_video
 from databasecommunication import DatabaseManager
 import uuid
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 
 # Create FastAPI app
 app = FastAPI()
@@ -28,19 +25,9 @@ app.add_middleware(
 os.makedirs("sign_videos", exist_ok=True)
 os.makedirs("recorded_videos", exist_ok=True)
 
-# Create Socket.IO server
-sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 db_manager = DatabaseManager()
-# Store last 100 acceleration readings
-acceleration_readings = []
-MAX_READINGS = 100
 
 # Data models
-class AccelerationData(BaseModel):
-    x: float
-    y: float
-    z: float
-
 class SearchWord(BaseModel):
     word: str
 
@@ -49,40 +36,6 @@ class VideoUpload(BaseModel):
     username: str
     label: str
     mime_type: str
-
-@sio.event
-async def connect(sid, environ):
-    print(f"Client connected: {sid}")
-    # Send current acceleration history to newly connected client
-    await sio.emit('acceleration-history', acceleration_readings, room=sid)
-
-@sio.event
-async def disconnect(sid):
-    print(f"Client disconnected: {sid}")
-
-# REST endpoint for receiving acceleration data
-@app.post("/acceleration")
-async def receive_acceleration(data: AccelerationData):
-    reading = {
-        **data.dict(),
-        "timestamp": int(datetime.now().timestamp() * 1000)  # milliseconds
-    }
-    
-    acceleration_readings.append(reading)
-    
-    # Keep only last MAX_READINGS
-    if len(acceleration_readings) > MAX_READINGS:
-        acceleration_readings.pop(0)
-    
-    # Broadcast to all connected Socket.IO clients
-    await sio.emit('acceleration-update', reading)
-    
-    return {"message": "Data received successfully"}
-
-# REST endpoint for getting acceleration data
-@app.get("/acceleration")
-async def get_acceleration():
-    return acceleration_readings
 
 # REST endpoint for searching sign language words
 @app.post("/search-sign")
@@ -174,9 +127,6 @@ async def upload_video(data: VideoUpload):
             "message": f"Error uploading video: {str(e)}"
         }
 
-# Mount Socket.IO app
-socket_app = socketio.ASGIApp(sio, app)
-
 @app.get("/user-counts")
 async def get_user_counts():
     try:
@@ -198,9 +148,6 @@ async def get_user_counts():
 if __name__ == "__main__":
     print("🚀 Starting server...")
     print("📡 Endpoints:")
-    print("   POST /acceleration - Send acceleration data")
-    print("   GET  /acceleration - Get all readings")
     print("   POST /search-sign  - Search for sign language videos")
     print("   POST /upload-video - Upload a recorded video")
-    print("   WS   /socket.io   - Real-time updates")
-    uvicorn.run(socket_app, host="0.0.0.0", port=3000)
+    uvicorn.run(app, host="0.0.0.0", port=3000)
