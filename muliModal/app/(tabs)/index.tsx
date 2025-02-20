@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { VideoRecorder, VideoQuality, FileType } from '../../components/VideoRecorder';
 import { RecordingOptions, RecordingInterval } from '../../components/RecordingOptions';
 import { VideoPlayer } from '../../components/VideoPlayer';
-import io from 'socket.io-client';
 import { router } from 'expo-router';
+import getEnvVars from '../../config/environment';
+
+const { apiUrl } = getEnvVars();
 
 const SIGN_WORDS = [
   'garbage',
@@ -58,7 +60,7 @@ export default function HomePage() {
         setUsername(currentUsername);
         // Fetch user count
         try {
-          const response = await fetch('http://localhost:3000/user-counts');
+          const response = await fetch(`${apiUrl}/user-counts`);
           const data = await response.json();
           if (data.status === 'success') {
             const userInfo = data.users.find((u: any) => u.username === currentUsername);
@@ -182,7 +184,7 @@ export default function HomePage() {
       setVideoBase64(null);
       setVideoUri(null);
 
-      const response = await fetch('http://localhost:3000/search-sign', {
+      const response = await fetch(`${apiUrl}/search-sign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -233,7 +235,7 @@ export default function HomePage() {
       reader.onloadend = async () => {
         const base64data = (reader.result as string).split(',')[1];
         
-        const uploadResponse = await fetch('http://localhost:3000/upload-video', {
+        const uploadResponse = await fetch(`${apiUrl}/upload-video`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

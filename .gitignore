@@ -47,9 +47,9 @@ var/
 .env.test.local
 .env.production.local
 
-# Video files
-server/videos/*.mp4
-!server/videos/banana_sign.mp4
-!server/videos/boss_sign.mp4
-!server/videos/brown_sign.mp4
-!server/videos/marriage_sign.mp4
+
+__pycache__/
+*.pyc
+.env
+sign_videos/
+recorded_videos/
