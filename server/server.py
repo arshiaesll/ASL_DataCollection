@@ -146,8 +146,9 @@ async def get_user_counts():
         }
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 3000))
     print("🚀 Starting server...")
     print("📡 Endpoints:")
     print("   POST /search-sign  - Search for sign language videos")
     print("   POST /upload-video - Upload a recorded video")
-    uvicorn.run(app, host="0.0.0.0", port=3000)
+    uvicorn.run(app, host="0.0.0.0", port=port)
