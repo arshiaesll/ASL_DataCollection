@@ -1,8 +1,16 @@
 from libsql_client import create_client_sync
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Database configuration
-DB_URL = "libsql://als-arshiaesll.turso.io"
-DB_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3Mzc4MjQyNDMsImlkIjoiZWRiZTJhMDEtZmNkMy00YTMwLTkwOGYtN2JkYjVlMmYzMzhhIn0.dEFevyrImjv5Pb9uUhb-zMnHGSjI7SeCnGTioUBHzrMo6R_1eeMilLrgC87X2E41VizS9zclqGrWsroVmSejCw"
+DB_URL = os.getenv('DB_URL')
+DB_AUTH_TOKEN = os.getenv('DB_AUTH_TOKEN')
+
+if not DB_URL or not DB_AUTH_TOKEN:
+    raise ValueError("Database credentials not found in environment variables")
 
 class DatabaseManager:
     def __init__(self):
@@ -11,29 +19,29 @@ class DatabaseManager:
             auth_token=DB_AUTH_TOKEN
         )
 
-    def initialize_tables(self):
-        """Create necessary tables if they don't exist."""
-        # Create users table
-        self.client.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password TEXT,
-                video_count INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+    # def initialize_tables(self):
+    #     """Create necessary tables if they don't exist."""
+    #     # Create users table
+    #     self.client.execute("""
+    #         CREATE TABLE IF NOT EXISTS users (
+    #             id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #             username TEXT UNIQUE NOT NULL,
+    #             password TEXT,
+    #             video_count INTEGER DEFAULT 0,
+    #             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    #         )
+    #     """)
 
 
-        # Create sign-videos table
-        self.client.execute("""
-            CREATE TABLE IF NOT EXISTS sign_videos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                data TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+    #     # Create sign-videos table
+    #     self.client.execute("""
+    #         CREATE TABLE IF NOT EXISTS sign_videos (
+    #             id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #             name TEXT UNIQUE NOT NULL,
+    #             data TEXT NOT NULL,
+    #             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    #         )
+    #     """)
 
     # User-related methods
     def create_user(self, username: str, password: str = ''):

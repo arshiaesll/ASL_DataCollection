@@ -11,19 +11,7 @@ import io from 'socket.io-client';
 import { router } from 'expo-router';
 
 const SIGN_WORDS = [
-  'hello',
-  'orange',
-  'banana',
-  'strawberry',
-  'please',
-  'good',
-  'bad',
-  'sorry',
-  'pear',
-  'peach',
-  'pineapple',
-  'watermelon',
-  'grape',
+  'garbage',
 ];
 
 export default function HomePage() {
@@ -72,7 +60,10 @@ export default function HomePage() {
     const handleStorageChange = async () => {
       const currentUsername = localStorage.getItem('username');
       if (!currentUsername) {
-        router.replace('/sign-in');
+        // Use setTimeout to ensure navigation happens after layout mount
+        setTimeout(() => {
+          router.replace('/sign-in');
+        }, 0);
       } else {
         setUsername(currentUsername);
         // Fetch user count

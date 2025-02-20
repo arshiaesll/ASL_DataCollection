@@ -57,7 +57,7 @@ export function VideoRecorder({
         mimeType: `video/${fileType}`,
         videoBitsPerSecond: bitrate
       });
-      
+
       chunksRef.current = [];
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -67,9 +67,9 @@ export function VideoRecorder({
       };
 
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: `video/${fileType}` });
-        const url = URL.createObjectURL(blob);
-        onRecordingComplete(url, 0);
+            const blob = new Blob(chunksRef.current, { type: `video/${fileType}` });
+            const url = URL.createObjectURL(blob);
+            onRecordingComplete(url, 0);
       };
 
       const duration = recordingInterval === '∞' ? undefined : parseInt(recordingInterval) * 1000;
@@ -77,7 +77,7 @@ export function VideoRecorder({
 
       if (duration) {
         setTimeout(() => {
-          stopWebRecording();
+            stopWebRecording();
         }, duration);
       }
     } catch (error) {
@@ -87,9 +87,9 @@ export function VideoRecorder({
 
   const stopWebRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      const tracks = mediaRecorderRef.current.stream.getTracks();
-      tracks.forEach(track => track.stop());
+        mediaRecorderRef.current.stop();
+        const tracks = mediaRecorderRef.current.stream.getTracks();
+        tracks.forEach(track => track.stop());
     }
   };
 
