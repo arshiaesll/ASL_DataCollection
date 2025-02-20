@@ -19,30 +19,6 @@ class DatabaseManager:
             auth_token=DB_AUTH_TOKEN
         )
 
-    # def initialize_tables(self):
-    #     """Create necessary tables if they don't exist."""
-    #     # Create users table
-    #     self.client.execute("""
-    #         CREATE TABLE IF NOT EXISTS users (
-    #             id INTEGER PRIMARY KEY AUTOINCREMENT,
-    #             username TEXT UNIQUE NOT NULL,
-    #             password TEXT,
-    #             video_count INTEGER DEFAULT 0,
-    #             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    #         )
-    #     """)
-
-
-    #     # Create sign-videos table
-    #     self.client.execute("""
-    #         CREATE TABLE IF NOT EXISTS sign_videos (
-    #             id INTEGER PRIMARY KEY AUTOINCREMENT,
-    #             name TEXT UNIQUE NOT NULL,
-    #             data TEXT NOT NULL,
-    #             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    #         )
-    #     """)
-
     # User-related methods
     def create_user(self, username: str, password: str = ''):
         """Create a new user."""
@@ -106,36 +82,12 @@ class DatabaseManager:
             print(f"Error adding data: {e}")
             return False
 
-    def get_data_by_name(self, name: str):
-        """Get data by name."""
-        try:
-            result = self.client.execute(
-                "SELECT * FROM data WHERE name = ?",
-                [name]
-            )
-            return result.rows[0] if result.rows else None
-        except Exception as e:
-            print(f"Error getting data: {e}")
-            return None
 
     def get_all_data(self):
         """Get all data entries."""
         result = self.client.execute("SELECT * FROM data ORDER BY created_at DESC")
         return result.rows
 
-    def update_data(self, name: str, new_data: str):
-        """Update data for a given name."""
-        self.client.execute(
-            "UPDATE data SET data = ? WHERE name = ?",
-            [new_data, name]
-        )
-
-    def delete_data(self, name: str):
-        """Delete data entry by name."""
-        self.client.execute(
-            "DELETE FROM data WHERE name = ?",
-            [name]
-        )
 
     def add_sign_video(self, name: str, data: str):
         """Add a new sign video to the database."""
@@ -172,24 +124,3 @@ class DatabaseManager:
             print(f"Error getting all sign videos: {e}")
             return []
 
-# Create a singleton instance
-db_manager = DatabaseManager()
-
-# Example usage:
-def example_usage():
-    # db_manager.initialize_tables()
-    
-    db_manager.initialize_tables()
-    # Example user operations
-    # db_manager.create_user("testuser", "password123")
-    # db_manager.update_user_count("testuser")
-    # user = db_manager.get_user("testuser")
-    # print("User:", user)
-    
-    # Example data operations
-    db_manager.add_data("test_entry", '{"key": "value"}')
-    data = db_manager.get_data_by_name("test_entry")
-    print("Data:", data)
-
-if __name__ == "__main__":
-    example_usage()
